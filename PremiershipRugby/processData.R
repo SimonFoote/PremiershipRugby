@@ -1,0 +1,45 @@
+#Title: Script to combine individual seasons data
+
+## Load Packages
+if (!require("xlsx"))
+    install.packages("xlsx")
+if (!require("dplyr"))
+    install.packages("dplyr")
+
+library(xlsx)
+library(dplyr)
+
+## Load Files
+file2012 <- read.xlsx("PremiershipRugby2012 - 2013.xls", 1)
+file2013 <- read.xlsx("PremiershipRugby2013 - 2014.xls", 1)
+file2014 <- read.xlsx("PremiershipRugby2014 - 2015.xls", 1)
+file2015 <- read.xlsx("PremiershipRugby2015 - 2016.xls", 1)
+
+## Bind all files to one dataset
+data1 <- rbind(file2012, file2013)
+data2 <- rbind(data1, file2014)
+data <- rbind(data2, file2015)
+
+## Select required Variables only
+mainData <- select(data, Venue, Location, Date, Time,starts_with("Home"), starts_with("Away"), Result, - ends_with("Short"))
+
+## Split data between past and future matches
+### Future
+futureData <- mainData[mainData$Date >= Sys.Date(),]
+futureData$Margin <- NULL
+futureData$TotalPoints <- NULL
+futureData$Winner <- NULL
+
+### Past
+pastData <- mainData[mainData$Date < Sys.Date(),]
+pastData <- mutate(pastData, Margin = ifelse(HomeScore > AwayScore, HomeScore - AwayScore, AwayScore - HomeScore)) %>%
+mutate(TotalPoints = HomeScore + AwayScore) %>%
+mutate(Winner = ifelse(as.character(Result == "Home"), as.character(Home), as.character(Away)))
+
+pastData$Winner <- as.factor(pastData$Winner)
+pastData$Home[pastData$Home == "Wasps"] <- "London Wasps"
+pastData$Away[pastData$Away == "Wasps"] <- "London Wasps"
+
+# Save Data in Excel
+write.xlsx2(pastData, "PastFixtures.xls")
+write.xlsx2(futureData, "FutureFixtures.xls")
